@@ -1700,7 +1700,7 @@ const FB_BRUECKE = {
 const FB_EINS = { 'tin.wo': 1, 'tin.seit': 1, 'tin.verlauf': 1, 'tin.hoer': 1, 'tin.laut': 1, 'tin.druck': 1, 'schw.dauer': 1, 'schw.verlauf': 1, 'schw.seit': 1, 'zit.seite': 1, 'zit.seit': 1 };
 /* ======================== FINDER-BRÜCKE ENDE ======================== */
 
-const MAX_THEMEN = 3;
+const MAX_THEMEN = 5;
 const SPEICHER = 'fragebogen-stufe1';
 const MARKUS_WA = '41789433860';
 const MARKUS_TEL = '+41789433860';
@@ -1786,7 +1786,7 @@ function rStart() {
   const k = S.kopf;
   return '<div class="section"><div class="section-title">WILLKOMMEN</div>' +
     '<p class="lead">Grüezi. Mit diesem Fragebogen erfassen Sie Ihre Beschwerden selbst, in Ruhe und so genau, wie es Ihnen möglich ist.</p>' +
-    '<p class="lead">Sie wählen bis zu drei Themen und tippen an, was zutrifft. Am Schluss senden Sie das Ergebnis als PDF per WhatsApp an Markus Rufer.</p>' +
+    '<p class="lead">Sie schreiben bis zu fünf Themen in eigenen Worten auf und tippen danach an, was zutrifft. Am Schluss senden Sie das Ergebnis als PDF per WhatsApp an Markus Rufer.</p>' +
     '<div class="note">Ihre Angaben werden nur auf Ihrem Handy zwischengespeichert. Sie können die App schliessen und später weitermachen.</div></div>' +
     '<div class="section"><div class="section-title">IHRE ANGABEN</div>' +
     '<label class="fld" for="k-name">Vor- und Nachname</label><input class="input" id="k-name" data-kopf="name" autocomplete="name" value="' + esc(k.name) + '">' +
@@ -1797,21 +1797,41 @@ function rStart() {
 }
 function resetKnopf() { return '<div style="text-align:center"><button class="btn-reset" type="button" data-act="reset">Neu beginnen (alles löschen)</button></div>'; }
 
-function rThemen() {
-  let h = '<h2 class="screen-title">Was plagt Sie?</h2><p class="screen-sub">Wählen Sie bis zu drei Themen. Das wichtigste zuerst.</p>';
-  h += '<div class="section"><div class="section-title">THEMA SUCHEN</div><div class="search-wrap">' +
-    '<svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>' +
-    '<input class="input search-input" id="suche" type="search" autocomplete="off" enterkeyhint="done" placeholder="z. B. Kopfschmerz, Ohrgeräusch …"></div>' +
-    '<div class="sugg" id="sugg"></div></div>';
-  h += '<div class="section"><div class="section-title">IHRE THEMEN (' + S.themen.length + ' VON ' + MAX_THEMEN + ')</div><div class="picked" id="picked">' + rPicked() + '</div></div>';
-  h += '<div class="section"><div class="section-title">HÄUFIGE THEMEN</div>';
-  const gew = S.themen.map(t => fold(t.titel));
-  for (const g of THEMEN) {
-    h += '<div class="grouphead">' + esc(g.gruppe) + '</div><div class="tiles">';
-    for (const t of g.themen) h += '<button type="button" class="tile' + (gew.includes(fold(t)) ? ' on' : '') + '" data-act="tile" data-t="' + esc(t) + '">' + esc(t) + '</button>';
-    h += '</div>';
+/* Seite 2: fünf Freitextfelder, ein Feld = ein Thema (Test 30.09.2026: Kacheln und Suche verwirrten). */
+function felderInit() {
+  if (!Array.isArray(S.felder) || S.felder.length !== MAX_THEMEN) {
+    const f = S.themen.map(t => t.feld || t.titel);
+    while (f.length < MAX_THEMEN) f.push('');
+    S.felder = f.slice(0, MAX_THEMEN);
   }
-  return h + '</div>';
+}
+function rThemen() {
+  felderInit();
+  let h = '<h2 class="screen-title">Was plagt Sie?</h2><p class="screen-sub">Schreiben Sie in jedes Feld ein Thema, in Ihren eigenen Worten. Das wichtigste zuerst. Ein Feld genügt, leere Felder lassen Sie einfach leer.</p>';
+  for (let i = 0; i < MAX_THEMEN; i++) {
+    h += '<div class="section"><div class="section-title">THEMA ' + (i + 1) + '</div>' +
+      '<input class="input" type="text" autocomplete="off" maxlength="60" enterkeyhint="' + (i < MAX_THEMEN - 1 ? 'next' : 'done') + '" data-feld="' + i + '" value="' + esc(S.felder[i]) + '" placeholder="' + (i ? '' : 'z. B. Rückenschmerzen') + '"></div>';
+  }
+  return h;
+}
+function felderUebernehmen() {
+  felderInit();
+  const neu = [], gesehen = new Set();
+  S.felder.forEach(f => {
+    const feld = String(f || '').trim().replace(/\s+/g, ' ').slice(0, 60);
+    if (feld.length < 2) return;
+    let kat = katalogFuer(feld), titel = SPEZIAL.includes(kat) ? KATALOGE[kat].titel : feld;
+    if (gesehen.has(fold(titel))) return; gesehen.add(fold(titel));
+    const passt = t => (t.feld && fold(t.feld) === fold(feld)) || fold(t.titel) === fold(titel);
+    let alt = S.themen.find(passt);
+    if (!alt && S.ablage) { const k = Object.keys(S.ablage).find(k => passt(S.ablage[k])); if (k) { alt = S.ablage[k]; delete S.ablage[k]; } }
+    neu.push(alt ? Object.assign(alt, { feld: feld }) : { titel: titel, kat: kat, a: {}, feld: feld });
+  });
+  /* Kein confirm(): in eingebetteten Vorschauen blockiert, dort blieb die App stehen (Meldung Markus 30.09.2026).
+     Antworten entfernter Themen werden beiseitegelegt und kommen zurück, wenn das Thema wieder eingetragen wird. */
+  S.ablage = S.ablage || {};
+  S.themen.filter(t => !neu.includes(t) && Object.keys(t.a).length).forEach(t => { S.ablage[fold(t.titel)] = t; });
+  S.themen = neu; speichern(); return true;
 }
 function rPicked() {
   if (!S.themen.length) return '<div class="picked-empty">Noch kein Thema gewählt.</div>';
@@ -1873,7 +1893,6 @@ function themaDazu(titel) {
 }
 function themaWeg(i) {
   const t = S.themen[i]; if (!t) return;
-  if (Object.keys(t.a).length && !confirm('«' + t.titel + '» entfernen? Ihre Antworten dazu gehen verloren.')) return;
   S.themen.splice(i, 1); speichern();
   const scrollY = window.scrollY; render(); window.scrollTo(0, scrollY);
 }
@@ -2024,9 +2043,8 @@ function kopfOk() {
 function weiter() {
   if (S.schritt === 'start' && !kopfOk()) return;
   if (S.schritt === 'themen') {
-    const inp = $('suche'), q = inp ? inp.value.trim() : '';
-    if (q.length >= 2) { themenDazu(q); return; }
-    if (!S.themen.length) { toast('Bitte wählen Sie mindestens ein Thema.'); return; }
+    if (!felderUebernehmen()) return;
+    if (!S.themen.length) { toast('Bitte schreiben Sie mindestens ein Thema in ein Feld.'); const f = document.querySelector('[data-feld="0"]'); if (f) f.focus(); return; }
   }
   if (S.zurUebersicht && S.schritt !== 'check' && S.schritt !== 'senden') {
     if (S.schritt === 'themen') { S.zurUebersicht = false; gehe('t0'); return; }
@@ -2042,7 +2060,8 @@ function zurueck() {
   if (i > 0) gehe(l[i - 1]);
 }
 function neuBeginnen() {
-  if (!confirm('Wirklich neu beginnen? Alle Angaben werden gelöscht.')) return;
+  const b = document.querySelector('.btn-reset');
+  if (b && !b.dataset.sicher) { b.dataset.sicher = '1'; b.textContent = 'Wirklich alles löschen? Nochmals tippen'; setTimeout(() => { if (b.isConnected) { delete b.dataset.sicher; b.textContent = 'Neu beginnen (alles löschen)'; } }, 4000); return; }
   try { localStorage.removeItem(SPEICHER); } catch (e) { }
   S = leer(); render(); window.scrollTo(0, 0);
 }
@@ -2289,12 +2308,13 @@ document.addEventListener('click', e => {
 document.addEventListener('input', e => {
   const el = e.target;
   if (el.dataset && el.dataset.kopf) { S.kopf[el.dataset.kopf] = el.value; speichern(); }
-  else if (el.id === 'suche') rSugg();
+  else if (el.dataset && el.dataset.feld !== undefined) { felderInit(); S.felder[+el.dataset.feld] = el.value; speichern(); }
   else if (el.dataset && el.dataset.act === 'txt') { const t = S.themen[+el.dataset.i]; if (el.value.trim()) t.a[el.dataset.b] = el.value; else delete t.a[el.dataset.b]; speichern(); }
   else if (el.dataset && el.dataset.act === 'allg') { S.allgemein = el.value; speichern(); }
 });
 document.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && e.target.id === 'suche') { e.preventDefault(); themenDazu(e.target.value); }
+  if (e.key === 'Enter' && e.target.dataset && e.target.dataset.feld !== undefined) { e.preventDefault();
+    const n = document.querySelector('[data-feld="' + (+e.target.dataset.feld + 1) + '"]'); if (n) n.focus(); else weiter(); }
 });
 $('nav-next').addEventListener('click', weiter);
 $('nav-back').addEventListener('click', zurueck);
