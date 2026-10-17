@@ -1533,6 +1533,30 @@ onko: {
       {"id": "onko.prob.nichts", "text": "nichts", "exklusiv": true} ] },
     { id: 'onko.text', frage: "Möchten Sie zu diesem Thema noch etwas ergänzen?", typ: 'text' }
   ]
+},
+
+bauch: {
+  id: 'bauch', titel: 'Bauch und Verdauung', suchbegriffe: [],
+  bloecke: [
+    { id: 'bauch.wie', frage: 'Was davon kennen Sie von Ihrem Bauch?', typ: 'mehrfach', antworten: [
+      {"id": "bauch.wie.morgensflach", "text": "Morgens ist der Bauch flach, im Lauf des Tages wird er dicker"},
+      {"id": "bauch.wie.frueh", "text": "Der Bauch bläht schon kurz nach dem Essen auf (innert etwa einer Stunde)"},
+      {"id": "bauch.wie.speisen", "text": "Schlimmer nach Zwiebeln, Hülsenfrüchten, Vollkorn, Süssem oder Obst"},
+      {"id": "bauch.wie.fasten", "text": "Mit langen Esspausen oder beim Fasten geht es dem Bauch deutlich besser"},
+      {"id": "bauch.wie.nichts", "text": "nichts davon", "exklusiv": true} ] },
+    { id: 'bauch.vg', frage: 'Gab es bei Ihnen etwas davon?', typ: 'mehrfach', antworten: [
+      {"id": "bauch.vg.antibiotika", "text": "Antibiotika – seither ist der Bauch nicht mehr wie vorher"},
+      {"id": "bauch.vg.infekt", "text": "Magen-Darm-Grippe oder Lebensmittelvergiftung – seither nicht mehr wie vorher"},
+      {"id": "bauch.vg.saeureblocker", "text": "Säureblocker über mehrere Wochen (z. B. Pantoprazol, Omeprazol, Nexium)"},
+      {"id": "bauch.vg.op", "text": "Operation am Bauch (z. B. Gallenblase, Blinddarm, Darm, Magen)"},
+      {"id": "bauch.vg.nichts", "text": "nichts davon", "exklusiv": true} ] },
+    { id: 'bauch.begl', frage: 'Ist bei Ihnen etwas davon bekannt?', typ: 'mehrfach', antworten: [
+      {"id": "bauch.begl.rls", "text": "Unruhige Beine am Abend oder in der Nacht"},
+      {"id": "bauch.begl.schilddruese", "text": "Schilddrüsenunterfunktion"},
+      {"id": "bauch.begl.rosazea", "text": "Rötung im Gesicht (Rosazea)"},
+      {"id": "bauch.begl.mangel", "text": "Eisen- oder Vitamin-B12-Mangel"},
+      {"id": "bauch.begl.nichts", "text": "nichts davon", "exklusiv": true} ] }
+  ]
 }
 
 };
@@ -1650,7 +1674,7 @@ function katalogFuer(titel) {
     if (p && p + bonus > bs) { bs = p + bonus; best = kid; }
   };
   for (const k of Object.values(KATALOGE)) {
-    if (k.id === 'uni') continue;
+    if (k.id === 'uni' || k.id === 'bauch') continue;
     pruefe(k.id, k.titel, 1); k.suchbegriffe.forEach(b => pruefe(k.id, b, 1));
   }
   for (const kid of Object.keys(FINDER_WORT)) FINDER_WORT[kid].split('|').forEach(w => pruefe(kid, w, 0));
@@ -1660,7 +1684,7 @@ function blockVon(kat, bid) { return KATALOGE[kat].bloecke.find(b => b.id === bi
 function antwortText(kat, bid, aid) { const b = blockVon(kat, bid); const a = b && b.antworten ? b.antworten.find(x => x.id === aid) : null; return a ? a.text : aid; }
 
 /* ---------- Schritte ---------- */
-function schritte() { return ['start', 'themen'].concat(S.themen.map((_, i) => 't' + i), ['allg', 'check', 'senden']); }
+function schritte() { return ['start', 'themen'].concat(S.themen.map((_, i) => 't' + i), ['bauch', 'allg', 'check', 'senden']); }
 function gehe(s) { S.schritt = s; speichern(); render(); window.scrollTo(0, 0); }
 
 /* ---------- Render ---------- */
@@ -1675,6 +1699,7 @@ function render() {
   const sc = $('screen');
   if (S.schritt === 'start') sc.innerHTML = rStart();
   else if (S.schritt === 'themen') sc.innerHTML = rThemen();
+  else if (S.schritt === 'bauch') sc.innerHTML = rBauch();
   else if (S.schritt === 'allg') sc.innerHTML = rAllg();
   else if (S.schritt === 'check') sc.innerHTML = rCheck();
   else if (S.schritt === 'senden') sc.innerHTML = rSenden();
@@ -1837,13 +1862,14 @@ function rBlock(i, t, b) {
   return h + '</div>';
 }
 function blockNeu(i, bid) {
-  const t = S.themen[i]; const b = blockVon(t.kat, bid);
+  const t = i === 'bauch' ? bauchObj() : S.themen[i]; const b = blockVon(t.kat, bid);
   const el = $('blk-' + i + '-' + bid.replace(/\./g, '_'));
   if (el) el.outerHTML = rBlock(i, t, b);
 }
 
+function bauchObj() { if (!S.bauch || !S.bauch.a) S.bauch = { kat: 'bauch', titel: KATALOGE.bauch.titel, a: {} }; return S.bauch; }
 function waehle(i, bid, aid) {
-  const t = S.themen[i]; if (!t) return;
+  const t = i === 'bauch' ? bauchObj() : S.themen[i]; if (!t) return;
   const b = blockVon(t.kat, bid); if (!b) return;
   if (b.typ === 'einfach') {
     if (t.a[bid] === aid) delete t.a[bid]; else t.a[bid] = aid;
@@ -1858,6 +1884,14 @@ function waehle(i, bid, aid) {
   speichern(); blockNeu(i, bid);
 }
 
+/* R323: Bauch und Verdauung — für jeden Kunden, unabhängig vom Thema (SIBO-Check, Auswertung nur im Finder) */
+function bauchHat() { const a = (S.bauch && S.bauch.a) || {}; return Object.keys(a).some(k => [].concat(a[k]).length); }
+function rBauch() {
+  const t = bauchObj();
+  let h = '<h2 class="screen-title">Bauch und Verdauung</h2><p class="screen-sub">Bitte antippen, was zutrifft – auch wenn Ihr Thema etwas ganz anderes ist. Der Bauch spielt bei vielen Beschwerden mit.</p>';
+  for (const b of KATALOGE.bauch.bloecke) h += rBlock('bauch', t, b);
+  return h;
+}
 function rAllg() {
   return '<h2 class="screen-title">Zum Schluss</h2><p class="screen-sub">Gibt es noch etwas, das Markus wissen sollte?</p>' +
     '<div class="section"><div class="section-title">WAS SONST NOCH WICHTIG IST</div>' +
@@ -1894,6 +1928,10 @@ function rCheck() {
     h += rows.length ? rows.map(r => ovRow(r.frage, r.text, r.auff)).join('') : '<div class="ov-empty">Noch nichts angetippt.</div>';
     h += '</div>';
   });
+  { const rows = auswertung(bauchObj());
+    h += '<div class="section ov-thema"><div class="ov-head"><h3>Bauch und Verdauung</h3><button type="button" class="btn btn-sec btn-edit" data-act="edit" data-s="bauch">Ändern</button></div>';
+    h += rows.length ? rows.map(r => ovRow(r.frage, r.text, r.auff)).join('') : '<div class="ov-empty">Noch nichts angetippt.</div>';
+    h += '</div>'; }
   h += '<div class="section"><div class="ov-head"><h3>Was sonst noch wichtig ist</h3><button type="button" class="btn btn-sec btn-edit" data-act="edit" data-s="allg">Ändern</button></div>' +
     (S.allgemein.trim() ? '<div class="ov-a">' + esc(S.allgemein.trim()) + '</div>' : '<div class="ov-empty">Keine Angabe.</div>') + '</div>';
   return h;
@@ -1929,6 +1967,7 @@ function nachricht() {
     if (!rows.length) L.push('- keine Angaben');
     rows.forEach(r => L.push('- ' + r.frage + ' ' + r.text.replace(/\s*\n\s*/g, ' ')));
   });
+  if (bauchHat()) { L.push(''); L.push('BAUCH UND VERDAUUNG'); auswertung(bauchObj()).forEach(r => L.push('- ' + r.frage + ' ' + r.text)); }
   if (S.allgemein.trim()) { L.push(''); L.push('SONST NOCH WICHTIG'); L.push(S.allgemein.trim()); }
   L.push('');
   if (APP_URL) { L.push('Auswerte-Code: antippen, dann «Code kopieren»'); L.push(APP_URL + '#code=' + fbCode()); }
@@ -2053,11 +2092,11 @@ function erstellePDF() {
 
   /* Themen */
   const LW = 52, VX = M + LW + 4, VW = IW - LW - 6;
-  S.themen.forEach((t, i) => {
+  S.themen.concat(bauchHat() ? [bauchObj()] : []).forEach((t, i) => {
     platz(24);
     doc.setFillColor(21, 101, 192); doc.roundedRect(M, y, IW, 9, 1.5, 1.5, 'F');
     doc.setFont('helvetica', 'bold'); doc.setFontSize(12.5); doc.setTextColor(255, 255, 255);
-    doc.text(latin('Thema ' + (i + 1) + ': ' + t.titel), M + 4, y + 6.2);
+    doc.text(latin(t.kat === 'bauch' ? t.titel : 'Thema ' + (i + 1) + ': ' + t.titel), M + 4, y + 6.2);
     const kt = t.kat === 'uni' ? 'allgemeiner Fragebogen' : (fold(KATALOGE[t.kat].titel) !== fold(t.titel) ? KATALOGE[t.kat].titel : '');
     if (kt) { doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(214, 232, 247); doc.text(latin(kt), M + IW - 4, y + 6.2, { align: 'right' }); }
     y += 12;
@@ -2149,6 +2188,8 @@ function fbDaten() {
       if (b.typ === 'skala') L.push(b.id + '=' + w); else if (b.typ !== 'text') [].concat(w).forEach(id => L.push(id)); });
     return [t.kat, t.titel, L];
   });
+  const ba = S.bauch && S.bauch.a ? S.bauch.a : null;
+  if (ba) { const L = []; KATALOGE.bauch.bloecke.forEach(b => [].concat(ba[b.id] || []).forEach(id => L.push(id))); if (L.length) d.x.push(['bauch', KATALOGE.bauch.titel, L]); }
   d.tp = d.th.slice();
   if (S.allgemein.trim()) frei.push(S.allgemein.trim());
   if (frei.length) d.f = frei.join('. ');
@@ -2202,7 +2243,7 @@ document.addEventListener('click', e => {
   }
   else if (act === 'add') themenDazu(el.dataset.t);
   else if (act === 'del') themaWeg(+el.dataset.i);
-  else if (act === 'ans') waehle(+el.dataset.i, el.dataset.b, el.dataset.a);
+  else if (act === 'ans') waehle(el.dataset.i === 'bauch' ? 'bauch' : +el.dataset.i, el.dataset.b, el.dataset.a);
   else if (act === 'skala') {
     const t = S.themen[+el.dataset.i]; const n = +el.dataset.n;
     if (t.a[el.dataset.b] === n) delete t.a[el.dataset.b]; else t.a[el.dataset.b] = n;
