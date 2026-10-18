@@ -122,7 +122,7 @@ textarea.input{min-height:96px;resize:vertical;line-height:1.45}
 <div class="progress"><div class="progress-bar"><div class="progress-fill" id="pfill"></div></div><div class="progress-txt" id="ptxt"></div></div>
 
 <div class="container" id="screen"></div>
-<div class="footer" id="fuss">Ihre Angaben bleiben auf Ihrem Handy, bis Sie das PDF selbst senden.<br>Bioenergetische Frequenzarbeit &middot; Markus Rufer &middot; Brünigstrasse 33 &middot; 3860 Meiringen &middot; 078 943 38 60</div>
+<div class="footer" id="fuss">Ihre Angaben bleiben auf Ihrem Handy, bis Sie das PDF selbst senden.<br>Bioenergetische Frequenzarbeit &middot; Markus Rufer &middot; Brünigstrasse 33 &middot; 3860 Meiringen &middot; 078 943 38 60<br>Idee, Konzept &amp; Architektur Markus Rufer<br>Technische Umsetzung. Claude by Anthropic</div>
 
 <div class="navbar"><div class="navbar-in">
   <button class="btn btn-sec" id="nav-back" type="button">Zurück</button>
@@ -1648,9 +1648,25 @@ function laden() {
     const r = localStorage.getItem(SPEICHER);
     if (!r) return;
     const o = JSON.parse(r);
-    if (o && o.v === 1 && o.kopf && Array.isArray(o.themen)) S = Object.assign(leer(), o);
+    if (o && o.v === 1 && o.kopf && Array.isArray(o.themen)) {
+      S = Object.assign(leer(), o);
+      /* Angefangener oder gesendeter Fragebogen: auf der Startseite fragen statt still weiterzumachen */
+      if (hatInhalt()) { FORTSETZEN = S.schritt === 'start' ? 'bauch' : S.schritt; S.schritt = 'start'; }
+    }
   } catch (e) { /* gesperrt oder defekt: leer starten */ }
 }
+let FORTSETZEN = '';
+function hatInhalt() { return !!(S.kopf.name.trim() || S.themen.length || (S.felder || []).some(f => String(f || '').trim()) || bauchHat() || S.allgemein.trim()); }
+function rWeiter() {
+  if (!FORTSETZEN) return '';
+  const wer = S.kopf.name.trim(), th = S.themen.map(t => t.titel).join(', ');
+  const kopf = S.gesendet ? 'Dieser Fragebogen wurde am ' + esc(S.gesendet) + ' gesendet.' : 'Hier ist ein angefangener Fragebogen gespeichert.';
+  return '<div class="section" style="border-left-color:var(--dunkel)"><div class="section-title" style="background:var(--dunkel)">GESPEICHERTER FRAGEBOGEN</div>' +
+    '<p class="lead" style="font-size:15px">' + kopf + (wer ? '<br><b>' + esc(wer) + '</b>' : '') + (th ? '<br>Themen: ' + esc(th) : '') + '</p>' +
+    '<button type="button" class="btn btn-pri btn-big" data-act="neu">Neuen Fragebogen beginnen</button>' +
+    '<button type="button" class="btn btn-sec btn-big" style="margin-top:10px" data-act="fortsetzen">' + (S.gesendet ? 'Ansehen oder nochmals senden' : 'Weiterfahren') + '</button></div>';
+}
+function markGesendet() { S.gesendet = chHeute(); speichern(); }
 function speichern() { try { localStorage.setItem(SPEICHER, JSON.stringify(S)); } catch (e) { } }
 
 /* ---------- Hilfen ---------- */
@@ -1684,8 +1700,8 @@ function blockVon(kat, bid) { return KATALOGE[kat].bloecke.find(b => b.id === bi
 function antwortText(kat, bid, aid) { const b = blockVon(kat, bid); const a = b && b.antworten ? b.antworten.find(x => x.id === aid) : null; return a ? a.text : aid; }
 
 /* ---------- Schritte ---------- */
-function schritte() { return ['start', 'themen'].concat(S.themen.map((_, i) => 't' + i), ['bauch', 'allg', 'check', 'senden']); }
-function gehe(s) { S.schritt = s; speichern(); render(); window.scrollTo(0, 0); }
+function schritte() { return ['start', 'bauch', 'themen'].concat(S.themen.map((_, i) => 't' + i), ['allg', 'check', 'senden']); }
+function gehe(s) { FORTSETZEN = ''; S.schritt = s; speichern(); render(); window.scrollTo(0, 0); }
 
 /* ---------- Render ---------- */
 function render() {
@@ -1719,9 +1735,9 @@ function navUpdate() {
 
 function rStart() {
   const k = S.kopf;
-  return '<div class="section"><div class="section-title">WILLKOMMEN</div>' +
+  return rWeiter() + '<div class="section"><div class="section-title">WILLKOMMEN</div>' +
     '<p class="lead">Grüezi. Mit diesem Fragebogen erfassen Sie Ihre Beschwerden selbst, in Ruhe und so genau, wie es Ihnen möglich ist.</p>' +
-    '<p class="lead">Sie schreiben bis zu fünf Themen in eigenen Worten auf und tippen danach an, was zutrifft. Am Schluss senden Sie das Ergebnis als PDF per WhatsApp an Markus Rufer.</p>' +
+    '<p class="lead">Zuerst kommen ein paar kurze Fragen zum Bauch. Danach schreiben Sie bis zu fünf Themen in eigenen Worten auf und tippen an, was zutrifft. Am Schluss senden Sie das Ergebnis per WhatsApp an Markus Rufer.</p>' +
     '<div class="note">Ihre Angaben werden nur auf Ihrem Handy zwischengespeichert. Sie können die App schliessen und später weitermachen.</div></div>' +
     '<div class="section"><div class="section-title">IHRE ANGABEN</div>' +
     '<label class="fld" for="k-name">Vor- und Nachname</label><input class="input" id="k-name" data-kopf="name" autocomplete="name" value="' + esc(k.name) + '">' +
@@ -1888,7 +1904,7 @@ function waehle(i, bid, aid) {
 function bauchHat() { const a = (S.bauch && S.bauch.a) || {}; return Object.keys(a).some(k => [].concat(a[k]).length); }
 function rBauch() {
   const t = bauchObj();
-  let h = '<h2 class="screen-title">Bauch und Verdauung</h2><p class="screen-sub">Bitte antippen, was zutrifft – auch wenn Ihr Thema etwas ganz anderes ist. Der Bauch spielt bei vielen Beschwerden mit.</p>';
+  let h = '<h2 class="screen-title">Bauch und Verdauung</h2><p class="screen-sub">Bevor es um Ihre Themen geht: Bitte antippen, was zutrifft – auch wenn Sie keine Bauchbeschwerden haben. Der Bauch spielt bei vielen Beschwerden mit.</p>';
   for (const b of KATALOGE.bauch.bloecke) h += rBlock('bauch', t, b);
   return h;
 }
@@ -1922,16 +1938,16 @@ function rCheck() {
   let h = '<h2 class="screen-title">Übersicht</h2><p class="screen-sub">Bitte kontrollieren Sie Ihre Angaben. Mit «Ändern» kommen Sie zurück.</p>';
   h += '<div class="section"><div class="ov-head"><h3>Ihre Angaben</h3><button type="button" class="btn btn-sec btn-edit" data-act="edit" data-s="start">Ändern</button></div>' +
     ovRow('Name', k.name) + ovRow('Geburtsjahr', k.jahr || '–') + ovRow('Handynummer', k.tel || '–') + '</div>';
+  { const rows = auswertung(bauchObj());
+    h += '<div class="section ov-thema"><div class="ov-head"><h3>Bauch und Verdauung</h3><button type="button" class="btn btn-sec btn-edit" data-act="edit" data-s="bauch">Ändern</button></div>';
+    h += rows.length ? rows.map(r => ovRow(r.frage, r.text, r.auff)).join('') : '<div class="ov-empty">Noch nichts angetippt.</div>';
+    h += '</div>'; }
   S.themen.forEach((t, i) => {
     const rows = auswertung(t);
     h += '<div class="section ov-thema"><div class="ov-head"><h3>' + (i + 1) + '. ' + esc(t.titel) + '</h3><button type="button" class="btn btn-sec btn-edit" data-act="edit" data-s="t' + i + '">Ändern</button></div>';
     h += rows.length ? rows.map(r => ovRow(r.frage, r.text, r.auff)).join('') : '<div class="ov-empty">Noch nichts angetippt.</div>';
     h += '</div>';
   });
-  { const rows = auswertung(bauchObj());
-    h += '<div class="section ov-thema"><div class="ov-head"><h3>Bauch und Verdauung</h3><button type="button" class="btn btn-sec btn-edit" data-act="edit" data-s="bauch">Ändern</button></div>';
-    h += rows.length ? rows.map(r => ovRow(r.frage, r.text, r.auff)).join('') : '<div class="ov-empty">Noch nichts angetippt.</div>';
-    h += '</div>'; }
   h += '<div class="section"><div class="ov-head"><h3>Was sonst noch wichtig ist</h3><button type="button" class="btn btn-sec btn-edit" data-act="edit" data-s="allg">Ändern</button></div>' +
     (S.allgemein.trim() ? '<div class="ov-a">' + esc(S.allgemein.trim()) + '</div>' : '<div class="ov-empty">Keine Angabe.</div>') + '</div>';
   return h;
@@ -1961,13 +1977,13 @@ function nachricht() {
   const auff = [];
   S.themen.forEach(t => auswertung(t).forEach(r => { if (r.auff) auff.push(t.titel + ': ' + r.text); }));
   if (auff.length) { L.push(''); L.push('!! AUFFÄLLIG: ' + auff.join(' / ')); }
+  if (bauchHat()) { L.push(''); L.push('BAUCH UND VERDAUUNG'); auswertung(bauchObj()).forEach(r => L.push('- ' + r.frage + ' ' + r.text)); }
   S.themen.forEach((t, i) => {
     L.push(''); L.push((i + 1) + ') ' + t.titel.toUpperCase());
     const rows = auswertung(t);
     if (!rows.length) L.push('- keine Angaben');
     rows.forEach(r => L.push('- ' + r.frage + ' ' + r.text.replace(/\s*\n\s*/g, ' ')));
   });
-  if (bauchHat()) { L.push(''); L.push('BAUCH UND VERDAUUNG'); auswertung(bauchObj()).forEach(r => L.push('- ' + r.frage + ' ' + r.text)); }
   if (S.allgemein.trim()) { L.push(''); L.push('SONST NOCH WICHTIG'); L.push(S.allgemein.trim()); }
   L.push('');
   if (APP_URL) { L.push('Auswerte-Code: antippen, dann «Code kopieren»'); L.push(APP_URL + '#code=' + fbCode()); }
@@ -2008,11 +2024,11 @@ function zurueck() {
   const l = schritte(); const i = l.indexOf(S.schritt);
   if (i > 0) gehe(l[i - 1]);
 }
+function neuJetzt() { try { localStorage.removeItem(SPEICHER); } catch (e) { } FORTSETZEN = ''; S = leer(); render(); window.scrollTo(0, 0); }
 function neuBeginnen() {
   const b = document.querySelector('.btn-reset');
   if (b && !b.dataset.sicher) { b.dataset.sicher = '1'; b.textContent = 'Wirklich alles löschen? Nochmals tippen'; setTimeout(() => { if (b.isConnected) { delete b.dataset.sicher; b.textContent = 'Neu beginnen (alles löschen)'; } }, 4000); return; }
-  try { localStorage.removeItem(SPEICHER); } catch (e) { }
-  S = leer(); render(); window.scrollTo(0, 0);
+  neuJetzt();
 }
 
 /* ---------- PDF ---------- */
@@ -2092,7 +2108,7 @@ function erstellePDF() {
 
   /* Themen */
   const LW = 52, VX = M + LW + 4, VW = IW - LW - 6;
-  S.themen.concat(bauchHat() ? [bauchObj()] : []).forEach((t, i) => {
+  (bauchHat() ? [bauchObj()] : []).concat(S.themen).forEach(t => { const i = S.themen.indexOf(t);
     platz(24);
     doc.setFillColor(21, 101, 192); doc.roundedRect(M, y, IW, 9, 1.5, 1.5, 'F');
     doc.setFont('helvetica', 'bold'); doc.setFontSize(12.5); doc.setTextColor(255, 255, 255);
@@ -2214,6 +2230,7 @@ async function senden() {
       btn.disabled = true;
       try {
         await navigator.share({ files: [file], title: 'Fragebogen', text: 'Mein Fragebogen (' + S.kopf.name.trim() + ') für Markus Rufer' });
+        markGesendet();
         st.innerHTML = '<span class="ok">Danke. Das PDF wurde übergeben.</span><br>Falls Sie WhatsApp nicht gewählt haben, tippen Sie nochmals auf den Knopf.';
         btn.textContent = 'Nochmals senden';
         return;
@@ -2251,8 +2268,10 @@ document.addEventListener('click', e => {
   }
   else if (act === 'edit') { S.zurUebersicht = true; gehe(el.dataset.s); }
   else if (act === 'send') senden();
-  else if (act === 'wa') location.href = waLink();
-  else if (act === 'sms') location.href = smsLink();
+  else if (act === 'wa') { markGesendet(); location.href = waLink(); }
+  else if (act === 'sms') { markGesendet(); location.href = smsLink(); }
+  else if (act === 'neu') neuJetzt();
+  else if (act === 'fortsetzen') gehe(FORTSETZEN || 'bauch');
   else if (act === 'dl') nurSpeichern();
   else if (act === 'reset') neuBeginnen();
 });
