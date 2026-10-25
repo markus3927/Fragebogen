@@ -56,6 +56,7 @@ textarea.input{min-height:96px;resize:vertical;line-height:1.45}
 .scale{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
 .scale button{min-height:46px;border:1.5px solid #cfdbe8;background:#fff;border-radius:10px;font-size:17px;font-weight:700;font-family:'Source Code Pro',monospace;color:var(--dunkel);cursor:pointer}
 .scale button.on{background:linear-gradient(135deg,var(--royal),#0d47a1);border-color:var(--royal);color:#fff}
+textarea.input.frei{min-height:52px;margin-top:10px;font-size:15px}
 .scale-ends{display:flex;justify-content:space-between;font-size:12.5px;color:var(--dim);margin-top:6px}
 .search-wrap{position:relative}
 .search-input{padding-left:42px}
@@ -1536,7 +1537,7 @@ onko: {
 },
 
 bauch: {
-  id: 'bauch', titel: 'Bauch und Verdauung', suchbegriffe: [],
+  id: 'bauch', titel: 'Bauch und Vorgeschichte', suchbegriffe: [],
   bloecke: [
     { id: 'bauch.wie', frage: 'Was davon kennen Sie von Ihrem Bauch?', typ: 'mehrfach', antworten: [
       {"id": "bauch.wie.morgensflach", "text": "Morgens ist der Bauch flach, im Lauf des Tages wird er dicker"},
@@ -1555,7 +1556,26 @@ bauch: {
       {"id": "bauch.begl.schilddruese", "text": "Schilddrüsenunterfunktion"},
       {"id": "bauch.begl.rosazea", "text": "Rötung im Gesicht (Rosazea)"},
       {"id": "bauch.begl.mangel", "text": "Eisen- oder Vitamin-B12-Mangel"},
-      {"id": "bauch.begl.nichts", "text": "nichts davon", "exklusiv": true} ] }
+      {"id": "bauch.begl.nichts", "text": "nichts davon", "exklusiv": true} ] },
+    { id: 'bauch.zeichen', frage: 'Kennen Sie etwas davon?', typ: 'mehrfach', antworten: [
+      {"id": "bauch.zeichen.suess", "text": "Starkes Verlangen nach Süssem oder Brot"},
+      {"id": "bauch.zeichen.zunge", "text": "Weiss belegte Zunge"},
+      {"id": "bauch.zeichen.pilz", "text": "Immer wieder Pilz (Haut, Nägel, Scheide oder Mund)"},
+      {"id": "bauch.zeichen.unvertr", "text": "Unverträglichkeit auf mehrere Lebensmittel"},
+      {"id": "bauch.zeichen.allergie", "text": "Allergien oder Heuschnupfen"},
+      {"id": "bauch.zeichen.nebel", "text": "Benommen oder müde nach dem Essen"},
+      {"id": "bauch.zeichen.nichts", "text": "nichts davon", "exklusiv": true} ] },
+    { id: 'bauch.inf', frage: 'Gab es bei Ihnen früher etwas davon?', typ: 'mehrfach', antworten: [
+      {"id": "bauch.inf.zecke", "text": "Zeckenstich oder Borreliose"},
+      {"id": "bauch.inf.pfeiffer", "text": "Pfeiffersches Drüsenfieber"},
+      {"id": "bauch.inf.covid", "text": "Covid oder Grippe – seither nicht mehr richtig fit"},
+      {"id": "bauch.inf.wieder", "text": "Immer wiederkehrende Infekte (z. B. Blase, Nebenhöhlen, Hals)"},
+      {"id": "bauch.inf.herpes", "text": "Herpes oder Gürtelrose"},
+      {"id": "bauch.inf.zahn", "text": "Wurzelbehandlung, Zahnherd oder Implantat"},
+      {"id": "bauch.inf.reise", "text": "Reisen in die Tropen oder ins ferne Ausland"},
+      {"id": "bauch.inf.tiere", "text": "Enger Kontakt mit Tieren (Haustiere, Bauernhof)"},
+      {"id": "bauch.inf.schimmel", "text": "Schimmel oder Feuchtigkeit in der Wohnung"},
+      {"id": "bauch.inf.nichts", "text": "nichts davon", "exklusiv": true} ] }
   ]
 }
 
@@ -1868,6 +1888,7 @@ function rBlock(i, t, b) {
     }
     h += '</div>';
     b.antworten.forEach(a => { if (a.hilfe && [].concat(wert || []).includes(a.id)) h += '<div class="fallback">' + esc(a.hilfe) + '</div>'; });
+    h += '<textarea class="input frei" rows="2" data-act="frei" data-i="' + i + '" data-b="' + b.id + '" placeholder="Anderes oder genauer – in eigenen Worten">' + esc((t.f && t.f[b.id]) || '') + '</textarea>';
   } else if (b.typ === 'skala') {
     h += '<div class="q-hint">1 = kaum, 10 = sehr stark</div><div class="scale">';
     for (let n = 1; n <= 10; n++) h += '<button type="button" class="' + (wert === n ? 'on' : '') + '" aria-pressed="' + (wert === n) + '" data-act="skala" data-i="' + i + '" data-b="' + b.id + '" data-n="' + n + '">' + n + '</button>';
@@ -1901,11 +1922,14 @@ function waehle(i, bid, aid) {
 }
 
 /* R323: Bauch und Verdauung — für jeden Kunden, unabhängig vom Thema (SIBO-Check, Auswertung nur im Finder) */
-function bauchHat() { const a = (S.bauch && S.bauch.a) || {}; return Object.keys(a).some(k => [].concat(a[k]).length); }
+function bauchHat() { const a = (S.bauch && S.bauch.a) || {}, f = (S.bauch && S.bauch.f) || {}; return Object.keys(a).some(k => [].concat(a[k]).length) || Object.keys(f).some(k => String(f[k]).trim()); }
 function rBauch() {
   const t = bauchObj();
-  let h = '<h2 class="screen-title">Bauch und Verdauung</h2><p class="screen-sub">Bevor es um Ihre Themen geht: Bitte antippen, was zutrifft – auch wenn Sie keine Bauchbeschwerden haben. Der Bauch spielt bei vielen Beschwerden mit.</p>';
-  for (const b of KATALOGE.bauch.bloecke) h += rBlock('bauch', t, b);
+  let h = '<h2 class="screen-title">' + esc(KATALOGE.bauch.titel) + '</h2><p class="screen-sub">Bevor es um Ihre Themen geht: Bitte antippen, was zutrifft – auch wenn Sie keine Bauchbeschwerden haben. Bauch und frühere Infekte spielen bei vielen Beschwerden mit.</p>';
+  for (const b of KATALOGE.bauch.bloecke) {
+    if (b.id === 'bauch.inf') h += '<div class="grouphead" style="margin-top:22px">Frühere Infekte und Belastungen</div>';
+    h += rBlock('bauch', t, b);
+  }
   return h;
 }
 function rAllg() {
@@ -1919,7 +1943,8 @@ function auswertung(t) {
   const k = KATALOGE[t.kat]; const rows = [];
   for (const b of k.bloecke) {
     const w = t.a[b.id];
-    if (w == null || w === '' || (Array.isArray(w) && !w.length)) continue;
+    const frei = String((t.f && t.f[b.id]) || '').trim().replace(/\s*\n\s*/g, ' ');
+    if (w == null || w === '' || (Array.isArray(w) && !w.length)) { if (frei) rows.push({ frage: b.frage, text: 'Eigene Worte: ' + frei, auff: false, typ: b.typ }); continue; }
     let text = '', auff = false;
     if (b.typ === 'skala') text = w + ' von 10';
     else if (b.typ === 'text') { text = String(w).trim(); if (!text) continue; }
@@ -1927,6 +1952,7 @@ function auswertung(t) {
       const ids = Array.isArray(w) ? w : [w];
       text = ids.map(id => antwortText(t.kat, b.id, id)).join(', ');
       if (b.auffaellig) auff = ids.some(id => { const a = b.antworten.find(x => x.id === id); return a && !a.exklusiv; });
+      if (frei) text += ' · Eigene Worte: ' + frei;
     }
     rows.push({ frage: b.frage, text: text, auff: auff, typ: b.typ });
   }
@@ -1939,7 +1965,7 @@ function rCheck() {
   h += '<div class="section"><div class="ov-head"><h3>Ihre Angaben</h3><button type="button" class="btn btn-sec btn-edit" data-act="edit" data-s="start">Ändern</button></div>' +
     ovRow('Name', k.name) + ovRow('Geburtsjahr', k.jahr || '–') + ovRow('Handynummer', k.tel || '–') + '</div>';
   { const rows = auswertung(bauchObj());
-    h += '<div class="section ov-thema"><div class="ov-head"><h3>Bauch und Verdauung</h3><button type="button" class="btn btn-sec btn-edit" data-act="edit" data-s="bauch">Ändern</button></div>';
+    h += '<div class="section ov-thema"><div class="ov-head"><h3>' + esc(KATALOGE.bauch.titel) + '</h3><button type="button" class="btn btn-sec btn-edit" data-act="edit" data-s="bauch">Ändern</button></div>';
     h += rows.length ? rows.map(r => ovRow(r.frage, r.text, r.auff)).join('') : '<div class="ov-empty">Noch nichts angetippt.</div>';
     h += '</div>'; }
   S.themen.forEach((t, i) => {
@@ -1977,7 +2003,7 @@ function nachricht() {
   const auff = [];
   S.themen.forEach(t => auswertung(t).forEach(r => { if (r.auff) auff.push(t.titel + ': ' + r.text); }));
   if (auff.length) { L.push(''); L.push('!! AUFFÄLLIG: ' + auff.join(' / ')); }
-  if (bauchHat()) { L.push(''); L.push('BAUCH UND VERDAUUNG'); auswertung(bauchObj()).forEach(r => L.push('- ' + r.frage + ' ' + r.text)); }
+  if (bauchHat()) { L.push(''); L.push(KATALOGE.bauch.titel.toUpperCase()); auswertung(bauchObj()).forEach(r => L.push('- ' + r.frage + ' ' + r.text)); }
   S.themen.forEach((t, i) => {
     L.push(''); L.push((i + 1) + ') ' + t.titel.toUpperCase());
     const rows = auswertung(t);
@@ -2198,16 +2224,24 @@ function fbDaten() {
     if (mod === 'schw' && (!d.m.schw || !d.m.schw.dauer) && (t.a['sch.wann'] || []).includes('sch.wann.dauernd')) setz('schw', 'dauer', 'dau');
   });
   /* Alle Antworten im neuen Format: [Katalog, Thema, [Antwort-IDs, Skala als «block=Wert»]] — Auswerter ab Finder v245 */
+  /* R336: 4. Element = Texte in eigenen Worten je Frage {Block-ID: Text}, auch das Textfeld am Schluss des Themas */
+  const eigene = t => { const o = {}; Object.keys(t.f || {}).forEach(k => { const x = String(t.f[k]).trim(); if (x) o[k] = x; });
+    KATALOGE[t.kat].bloecke.forEach(b => { if (b.typ === 'text' && String(t.a[b.id] || '').trim()) o[b.id] = String(t.a[b.id]).trim(); }); return o; };
   d.x = S.themen.map(t => {
     const L = [];
     KATALOGE[t.kat].bloecke.forEach(b => { const w = t.a[b.id]; if (w == null || w === '') return;
       if (b.typ === 'skala') L.push(b.id + '=' + w); else if (b.typ !== 'text') [].concat(w).forEach(id => L.push(id)); });
-    return [t.kat, t.titel, L];
+    const e = eigene(t);
+    return Object.keys(e).length ? [t.kat, t.titel, L, e] : [t.kat, t.titel, L];
   });
   const ba = S.bauch && S.bauch.a ? S.bauch.a : null;
-  if (ba) { const L = []; KATALOGE.bauch.bloecke.forEach(b => [].concat(ba[b.id] || []).forEach(id => L.push(id))); if (L.length) d.x.push(['bauch', KATALOGE.bauch.titel, L]); }
+  if (ba || (S.bauch && S.bauch.f)) { const L = []; KATALOGE.bauch.bloecke.forEach(b => [].concat((ba || {})[b.id] || []).forEach(id => L.push(id)));
+    const e = eigene(bauchObj()); if (L.length || Object.keys(e).length) d.x.push(Object.keys(e).length ? ['bauch', KATALOGE.bauch.titel, L, e] : ['bauch', KATALOGE.bauch.titel, L]); }
   d.tp = d.th.slice();
-  if (S.allgemein.trim()) frei.push(S.allgemein.trim());
+  S.themen.concat(S.bauch ? [S.bauch] : []).forEach(t => Object.keys(t.f || {}).forEach(bid => {
+    const x = String(t.f[bid]).trim(); if (x) frei.push(x);
+  }));
+  if (S.allgemein.trim()) { frei.push(S.allgemein.trim()); d.s = S.allgemein.trim(); }   /* R336: d.s fürs Kontrollblatt (Notizen) */
   if (frei.length) d.f = frei.join('. ');
   if (!Object.keys(d.vg).length) delete d.vg;
   return d;
@@ -2280,6 +2314,10 @@ document.addEventListener('input', e => {
   if (el.dataset && el.dataset.kopf) { S.kopf[el.dataset.kopf] = el.value; speichern(); }
   else if (el.dataset && el.dataset.feld !== undefined) { felderInit(); S.felder[+el.dataset.feld] = el.value; speichern(); }
   else if (el.dataset && el.dataset.act === 'txt') { const t = S.themen[+el.dataset.i]; if (el.value.trim()) t.a[el.dataset.b] = el.value; else delete t.a[el.dataset.b]; speichern(); }
+  else if (el.dataset && el.dataset.act === 'frei') {
+    const t = el.dataset.i === 'bauch' ? bauchObj() : S.themen[+el.dataset.i]; if (!t) return;
+    t.f = t.f || {}; if (el.value.trim()) t.f[el.dataset.b] = el.value; else delete t.f[el.dataset.b]; speichern();
+  }
   else if (el.dataset && el.dataset.act === 'allg') { S.allgemein = el.value; speichern(); }
 });
 document.addEventListener('keydown', e => {
