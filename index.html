@@ -1574,14 +1574,12 @@ bauch: {
       {"id": "bauch.inf.reise", "text": "Reisen in die Tropen oder ins ferne Ausland"},
       {"id": "bauch.inf.tiere", "text": "Enger Kontakt mit Tieren (Haustiere, Bauernhof)"},
       {"id": "bauch.inf.schimmel", "text": "Schimmel oder Feuchtigkeit in der Wohnung"},
-      {"id": "bauch.inf.nichts", "text": "nichts davon", "exklusiv": true} ] },
-    { id: 'bauch.zahn', frage: 'Haben oder hatten Sie etwas davon?', typ: 'mehrfach', antworten: [
-      {"id": "bauch.inf.zahn", "text": "Wurzelbehandelter oder toter Zahn"},
-      {"id": "bauch.zahn.implantat", "text": "Zahnimplantat"},
-      {"id": "bauch.zahn.gezogen", "text": "Weisheitszähne oder andere Zähne gezogen"},
-      {"id": "bauch.zahn.amalgam", "text": "Amalgamfüllungen (heute oder früher)"},
-      {"id": "bauch.zahn.fremd", "text": "Anderes Implantat oder Prothese (z. B. Hüfte, Knie, Brust, Schrauben, Stent, Spirale)"},
-      {"id": "bauch.zahn.nichts", "text": "nichts davon", "exklusiv": true} ] }
+      {"id": "bauch.inf.zahn", "text": "Wurzelbehandelter oder toter Zahn (auch wenn er nicht wehtut)"},
+      {"id": "bauch.inf.implantat", "text": "Zahnimplantat"},
+      {"id": "bauch.inf.gezogen", "text": "Weisheitszähne oder andere Zähne gezogen"},
+      {"id": "bauch.inf.amalgam", "text": "Amalgamfüllungen (heute oder früher)"},
+      {"id": "bauch.inf.fremd", "text": "Anderes Implantat oder Prothese (z. B. Hüfte, Knie, Brust, Schrauben, Stent, Spirale)"},
+      {"id": "bauch.inf.nichts", "text": "nichts davon", "exklusiv": true} ] }
   ]
 }
 
@@ -1676,11 +1674,14 @@ function laden() {
     const o = JSON.parse(r);
     if (o && o.v === 1 && o.kopf && Array.isArray(o.themen)) {
       S = Object.assign(leer(), o);
-      /* Zahn-Antwort lag bis 27.10.2026 bei den Infekten */
+      /* Zwischenstand 27.10.2026: Zähne kurz als eigener Block — Antworten zurück zu «früher» */
       const ba = S.bauch && S.bauch.a;
-      if (ba && Array.isArray(ba['bauch.inf']) && ba['bauch.inf'].includes('bauch.inf.zahn')) {
-        ba['bauch.inf'] = ba['bauch.inf'].filter(x => x !== 'bauch.inf.zahn'); if (!ba['bauch.inf'].length) delete ba['bauch.inf'];
-        ba['bauch.zahn'] = [].concat(ba['bauch.zahn'] || []).filter(x => x !== 'bauch.inf.zahn').concat('bauch.inf.zahn');
+      if (ba && ba['bauch.zahn']) {
+        const neu = [].concat(ba['bauch.zahn']).map(x => x.replace(/^bauch\.zahn\./, 'bauch.inf.')).filter(x => x !== 'bauch.inf.nichts');
+        const alt = [].concat(ba['bauch.inf'] || []).filter(x => x !== 'bauch.inf.nichts');
+        const zus = alt.concat(neu.filter(x => !alt.includes(x)));
+        if (zus.length) ba['bauch.inf'] = zus; delete ba['bauch.zahn'];
+        if (S.bauch.f && S.bauch.f['bauch.zahn']) { S.bauch.f['bauch.inf'] = [S.bauch.f['bauch.inf'], S.bauch.f['bauch.zahn']].filter(Boolean).join(' '); delete S.bauch.f['bauch.zahn']; }
       }
       /* Angefangener oder gesendeter Fragebogen: auf der Startseite fragen statt still weiterzumachen */
       if (hatInhalt()) { FORTSETZEN = S.schritt === 'start' ? 'bauch' : S.schritt; S.schritt = 'start'; }
@@ -1940,7 +1941,6 @@ function rBauch() {
   let h = '<h2 class="screen-title">' + esc(KATALOGE.bauch.titel) + '</h2><p class="screen-sub">Bevor es um Ihre Themen geht: Bitte antippen, was zutrifft – auch wenn Sie keine Bauchbeschwerden haben. Bauch und frühere Infekte spielen bei vielen Beschwerden mit.</p>';
   for (const b of KATALOGE.bauch.bloecke) {
     if (b.id === 'bauch.inf') h += '<div class="grouphead" style="margin-top:22px">Frühere Infekte und Belastungen</div>';
-    if (b.id === 'bauch.zahn') h += '<div class="grouphead" style="margin-top:22px">Zähne, Implantate und Metall</div><p class="screen-sub" style="margin:4px 0 8px">Auch wenn es keine Beschwerden macht – tote Zähne und Implantate tun oft nicht weh.</p>';
     h += rBlock('bauch', t, b);
   }
   return h;
