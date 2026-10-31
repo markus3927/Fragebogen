@@ -2313,6 +2313,9 @@ function fbDaten() {
   }));
   if (S.allgemein.trim()) { frei.push(S.allgemein.trim()); d.s = S.allgemein.trim(); }   /* R336: d.s fürs Kontrollblatt (Notizen) */
   if (frei.length) d.f = frei.join('. ');
+  /* R373 Anmeldung (31.10.2026): Adresse, Mail, Zahlart, bestätigt — für Rechnung und Kontrollblatt */
+  { const kk = S.kopf, an = {}; [['strasse', 's'], ['ort', 'o'], ['mail', 'm'], ['za', 'z']].forEach(p => { const x = String(kk[p[0]] || '').trim(); if (x) an[p[1]] = x; });
+    if (kk.ok) an.ok = 1; if (Object.keys(an).length) d.a = an; }
   if (!Object.keys(d.vg).length) delete d.vg;
   return d;
 }
