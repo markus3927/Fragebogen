@@ -48,6 +48,11 @@ textarea.input{min-height:96px;resize:vertical;line-height:1.45}
 .q{font-weight:700;font-size:16px;color:var(--dunkel);margin-bottom:4px;line-height:1.35}
 .q-hint{font-size:12.5px;color:var(--dim);margin-bottom:10px}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
+/* Anmeldung (31.10.2026) */
+.anm-l{margin:0 0 4px 20px;font-size:15px;line-height:1.55}.anm-l li{margin-bottom:6px}
+.anm-za{flex-direction:column}.anm-za .chip,.anm-ok{width:100%}
+.anm-za .chip small{display:block;font-size:13px;font-weight:400;opacity:.85;margin-top:2px}
+.anm-ok{font-size:15px;line-height:1.45}
 .chip{min-height:44px;padding:9px 14px;border:1.5px solid #cfdbe8;background:#fff;border-radius:10px;font-size:15px;font-family:inherit;color:var(--text);cursor:pointer;text-align:left;line-height:1.3;max-width:100%;overflow-wrap:anywhere}
 .chip:focus-visible,.tile:focus-visible,.btn:focus-visible,.scale button:focus-visible{outline:3px solid var(--akzent);outline-offset:2px}
 .chip.on{background:linear-gradient(135deg,var(--royal),#0d47a1);border-color:var(--royal);color:#fff;font-weight:600}
@@ -1665,7 +1670,7 @@ const MARKUS_TEL = '+41789433860';
 const APP_URL = /^https?:$/.test(location.protocol) ? location.origin + location.pathname : '';
 
 /* ---------- Zustand ---------- */
-function leer() { return { v: 1, schritt: 'start', kopf: { name: '', jahr: '', tel: '' }, themen: [], allgemein: '', zurUebersicht: false }; }
+function leer() { return { v: 1, schritt: 'start', kopf: { name: '', jahr: '', tel: '', strasse: '', ort: '', mail: '', za: '', ok: false }, themen: [], allgemein: '', zurUebersicht: false }; }
 let S = leer();
 function laden() {
   try {
@@ -1674,6 +1679,7 @@ function laden() {
     const o = JSON.parse(r);
     if (o && o.v === 1 && o.kopf && Array.isArray(o.themen)) {
       S = Object.assign(leer(), o);
+      S.kopf = Object.assign(leer().kopf, o.kopf);   /* ältere Zwischenstände ohne Anmeldung */
       /* Zwischenstand 27.10.2026: Zähne kurz als eigener Block — Antworten zurück zu «früher» */
       const ba = S.bauch && S.bauch.a;
       if (ba && ba['bauch.zahn']) {
@@ -1733,7 +1739,7 @@ function blockVon(kat, bid) { return KATALOGE[kat].bloecke.find(b => b.id === bi
 function antwortText(kat, bid, aid) { const b = blockVon(kat, bid); const a = b && b.antworten ? b.antworten.find(x => x.id === aid) : null; return a ? a.text : aid; }
 
 /* ---------- Schritte ---------- */
-function schritte() { return ['start', 'bauch', 'themen'].concat(S.themen.map((_, i) => 't' + i), ['allg', 'check', 'senden']); }
+function schritte() { return ['start', 'bauch', 'themen'].concat(S.themen.map((_, i) => 't' + i), ['allg', 'anm', 'check', 'senden']); }
 function gehe(s) { FORTSETZEN = ''; S.schritt = s; speichern(); render(); window.scrollTo(0, 0); }
 
 /* ---------- Render ---------- */
@@ -1750,6 +1756,7 @@ function render() {
   else if (S.schritt === 'themen') sc.innerHTML = rThemen();
   else if (S.schritt === 'bauch') sc.innerHTML = rBauch();
   else if (S.schritt === 'allg') sc.innerHTML = rAllg();
+  else if (S.schritt === 'anm') sc.innerHTML = rAnm();
   else if (S.schritt === 'check') sc.innerHTML = rCheck();
   else if (S.schritt === 'senden') sc.innerHTML = rSenden();
   else sc.innerHTML = rThema(+S.schritt.slice(1));
@@ -1770,7 +1777,7 @@ function rStart() {
   const k = S.kopf;
   return rWeiter() + '<div class="section"><div class="section-title">WILLKOMMEN</div>' +
     '<p class="lead">Guten Tag. Mit diesem Fragebogen erfassen Sie Ihre Beschwerden selbst, in Ruhe und so genau, wie es Ihnen möglich ist.</p>' +
-    '<p class="lead">Zuerst kommen ein paar kurze Fragen zum Bauch. Danach schreiben Sie bis zu fünf Themen in eigenen Worten auf und tippen an, was zutrifft. Am Schluss senden Sie das Ergebnis per WhatsApp an Markus Rufer.</p>' +
+    '<p class="lead">Zuerst kommen ein paar kurze Fragen zum Bauch. Danach schreiben Sie bis zu fünf Themen in eigenen Worten auf und tippen an, was zutrifft. Am Schluss melden Sie sich an (Adresse, Zahlart) und senden alles per WhatsApp an Markus Rufer.</p>' +
     '<div class="note">Ihre Angaben werden nur auf Ihrem Handy zwischengespeichert. Sie können die App schliessen und später weitermachen.</div></div>' +
     '<div class="section"><div class="section-title">IHRE ANGABEN</div>' +
     '<label class="fld" for="k-name">Vor- und Nachname</label><input class="input" id="k-name" data-kopf="name" autocomplete="name" value="' + esc(k.name) + '">' +
@@ -1972,6 +1979,48 @@ function auswertung(t) {
   return rows;
 }
 
+/* ---------- Anmeldung mit Preisen und Zahlart (Markus 31.10.2026: «in der Fragebogen-App sollte die komplette Anmeldung
+   inkl. Bezahlmodus stehen») ---------- */
+const ZAHLARTEN = [
+  ['mail', 'Rechnung per E-Mail', 'mit QR-Einzahlungsschein'],
+  ['twint', 'TWINT', 'an 078 943 38 60'],
+  ['bar', 'Bar im Couvert', ''],
+  ['post', 'Papierrechnung per Post', 'mit Einzahlungsschein, plus CHF 10.– pro Rechnung']
+];
+function zaText(z) { const a = ZAHLARTEN.find(x => x[0] === z); return a ? a[1] : ''; }
+function adresseText() { const k = S.kopf; return [k.strasse.trim(), k.ort.trim()].filter(Boolean).join(', '); }
+function rAnm() {
+  const k = S.kopf;
+  return '<h2 class="screen-title">Anmeldung</h2><p class="screen-sub">Zum Schluss Ihre Adresse und wie Sie bezahlen möchten.</p>' +
+    '<div class="section"><div class="section-title">PREISE</div><ul class="anm-l">' +
+    '<li><b>Die ersten 14 Tage sind gratis</b>, ohne Verpflichtung.</li>' +
+    '<li>Danach <b>CHF 20.– pro Woche</b>, einzelne Tage CHF 2.85. Abgerechnet wird auf den Tag genau, jeweils Ende Monat.</li>' +
+    '<li><b>Jederzeit beendbar</b>: keine Vertragsbindung, keine Kündigungsfrist.</li>' +
+    '<li>Alle 14 Tage senden Sie mir frisch geschnittene Fingernägel (rund 4 Stück, 2 pro Hand).</li>' +
+    '<li>Zahlbar innert 10 Tagen.</li></ul></div>' +
+    '<div class="section"><div class="section-title">ADRESSE</div>' +
+    '<label class="fld" for="a-strasse">Strasse und Nummer</label><input class="input" id="a-strasse" data-kopf="strasse" autocomplete="address-line1" placeholder="z. B. Bahnhofstrasse 12" value="' + esc(k.strasse) + '">' +
+    '<label class="fld" for="a-ort">PLZ und Ort</label><input class="input" id="a-ort" data-kopf="ort" autocomplete="address-level2" placeholder="z. B. 3860 Meiringen" value="' + esc(k.ort) + '">' +
+    '<label class="fld" for="a-mail">E-Mail <span style="font-weight:400">(wenn vorhanden)</span></label><input class="input" id="a-mail" data-kopf="mail" type="email" autocomplete="email" placeholder="z. B. name@beispiel.ch" value="' + esc(k.mail) + '">' +
+    '<div class="note" style="margin-top:10px">Mit E-Mail erhalten Sie die Rechnung per E-Mail. Ohne E-Mail kommt sie auf Papier.</div></div>' +
+    '<div class="section"><div class="section-title">BEZAHLUNG</div><p class="lead" style="font-size:15px">Wie möchten Sie bezahlen?</p><div class="chips anm-za">' +
+    ZAHLARTEN.map(z => '<button type="button" class="chip' + (k.za === z[0] ? ' on' : '') + '" data-act="za" data-v="' + z[0] + '"><b>' + (k.za === z[0] ? '✓ ' : '') + esc(z[1]) + '</b>' + (z[2] ? '<small>' + esc(z[2]) + '</small>' : '') + '</button>').join('') +
+    '</div></div>' +
+    '<div class="section"><div class="section-title">ANMELDEN</div>' +
+    '<button type="button" class="chip anm-ok' + (k.ok ? ' on' : '') + '" data-act="anmok">' + (k.ok ? '✓ ' : '☐ ') + 'Ich melde mich an und bin mit den Preisen einverstanden. Meine Angaben dürfen für die Begleitung und die Abrechnung bearbeitet werden.</button>' +
+    '<div class="err" id="a-err"></div></div>';
+}
+function anmOk() {
+  const k = S.kopf, e = $('a-err'); let msg = '';
+  if (!k.strasse.trim()) msg = 'Bitte Strasse und Nummer eingeben.';
+  else if (!/^\d{4}\s+\S/.test(k.ort.trim())) msg = 'Bitte PLZ und Ort eingeben, z. B. 3860 Meiringen.';
+  else if (k.mail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(k.mail.trim())) msg = 'Die E-Mail-Adresse scheint nicht zu stimmen.';
+  else if (!k.za) msg = 'Bitte wählen Sie, wie Sie bezahlen möchten.';
+  else if (k.za === 'mail' && !k.mail.trim()) msg = 'Für die Rechnung per E-Mail braucht es Ihre E-Mail-Adresse.';
+  else if (!k.ok) msg = 'Bitte bestätigen Sie die Anmeldung (Feld ganz unten antippen).';
+  if (e) { e.textContent = msg; e.classList.toggle('show', !!msg); if (msg) e.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+  return !msg;
+}
 function rCheck() {
   const k = S.kopf;
   let h = '<h2 class="screen-title">Übersicht</h2><p class="screen-sub">Bitte kontrollieren Sie Ihre Angaben. Mit «Ändern» kommen Sie zurück.</p>';
@@ -1987,6 +2036,9 @@ function rCheck() {
     h += rows.length ? rows.map(r => ovRow(r.frage, r.text, r.auff)).join('') : '<div class="ov-empty">Noch nichts angetippt.</div>';
     h += '</div>';
   });
+  h += '<div class="section"><div class="ov-head"><h3>Anmeldung</h3><button type="button" class="btn btn-sec btn-edit" data-act="edit" data-s="anm">Ändern</button></div>' +
+    ovRow('Adresse', adresseText() || '–') + ovRow('E-Mail', k.mail.trim() || '– (Rechnung auf Papier)') + ovRow('Zahlart', zaText(k.za) || '–') +
+    ovRow('Anmeldung', k.ok ? 'bestätigt, Preise akzeptiert' : 'noch nicht bestätigt') + '</div>';
   h += '<div class="section"><div class="ov-head"><h3>Was sonst noch wichtig ist</h3><button type="button" class="btn btn-sec btn-edit" data-act="edit" data-s="allg">Ändern</button></div>' +
     (S.allgemein.trim() ? '<div class="ov-a">' + esc(S.allgemein.trim()) + '</div>' : '<div class="ov-empty">Keine Angabe.</div>') + '</div>';
   return h;
@@ -2012,6 +2064,10 @@ function nachricht() {
   L.push('Name: ' + k.name.trim());
   if (k.jahr.trim()) L.push('Geburtsjahr: ' + k.jahr.trim());
   if (k.tel.trim()) L.push('Handy: ' + k.tel.trim());
+  if (adresseText()) L.push('Adresse: ' + adresseText());
+  if (k.mail.trim()) L.push('E-Mail: ' + k.mail.trim());
+  if (k.za) L.push('Zahlart: ' + zaText(k.za));
+  if (k.ok) L.push('Anmeldung: bestätigt, Preise akzeptiert');
   L.push('Datum: ' + chHeute());
   const auff = [];
   S.themen.forEach(t => auswertung(t).forEach(r => { if (r.auff) auff.push(t.titel + ': ' + r.text); }));
@@ -2046,6 +2102,7 @@ function kopfOk() {
 }
 function weiter() {
   if (S.schritt === 'start' && !kopfOk()) return;
+  if (S.schritt === 'anm' && !anmOk()) return;
   if (S.schritt === 'themen') {
     if (!felderUebernehmen()) return;
     if (!S.themen.length) { toast('Bitte schreiben Sie mindestens ein Thema in ein Feld.'); const f = document.querySelector('[data-feld="0"]'); if (f) f.focus(); return; }
@@ -2115,7 +2172,7 @@ function erstellePDF() {
 
   /* Kopfdaten */
   const k = S.kopf;
-  const kd = [['Kunde', k.name.trim()], ['Geburtsjahr', k.jahr.trim() || '-'], ['Handynummer', k.tel.trim() || '-'], ['Ausgefüllt am', chHeute()]];
+  const kd = [['Kunde', k.name.trim()], ['Geburtsjahr', k.jahr.trim() || '-'], ['Handynummer', k.tel.trim() || '-'], ['Adresse', adresseText() || '-'], ['E-Mail', k.mail.trim() || '-'], ['Zahlart', zaText(k.za) || '-'], ['Anmeldung', k.ok ? 'bestätigt, Preise akzeptiert' : '-'], ['Ausgefüllt am', chHeute()]];
   const kh = 7 + kd.length * 6.2 + 2;
   doc.setFillColor(245, 248, 251); doc.setDrawColor(208, 220, 232); doc.roundedRect(M, y, IW, kh, 2, 2, 'FD');
   doc.setFillColor(21, 101, 192); doc.rect(M, y, 1.6, kh, 'F');
@@ -2313,6 +2370,8 @@ document.addEventListener('click', e => {
     if (t.a[el.dataset.b] === n) delete t.a[el.dataset.b]; else t.a[el.dataset.b] = n;
     speichern(); blockNeu(+el.dataset.i, el.dataset.b);
   }
+  else if (act === 'za') { S.kopf.za = el.dataset.v; speichern(); render(); }
+  else if (act === 'anmok') { S.kopf.ok = !S.kopf.ok; speichern(); render(); }
   else if (act === 'edit') { S.zurUebersicht = true; gehe(el.dataset.s); }
   else if (act === 'send') senden();
   else if (act === 'wa') { markGesendet(); location.href = waLink(); }
